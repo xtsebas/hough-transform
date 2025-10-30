@@ -8,12 +8,14 @@
  To build use  : make
  ============================================================================
  */
+#include "../include/image_utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
 #include <string.h>
 #include "common/pgm.h"
+#include <vector>
 
 const int degreeInc = 2;
 const int degreeBins = 180 / degreeInc;
@@ -72,9 +74,9 @@ void CPU_HoughTran (unsigned char *pic, int w, int h, int **acc)
 // The accummulator memory needs to be allocated by the host in global memory
 __global__ void GPU_HoughTran (unsigned char *pic, int w, int h, int *acc, float rMax, float rScale, float *d_Cos, float *d_Sin)
 {
-  //TODO calcular: int gloID = ?
-  int gloID = w * h + 1; //TODO
-  if (gloID > w * h) return;      // in case of extra threads in block
+  // Calcular ID global del thread
+  int gloID = blockIdx.x * blockDim.x + threadIdx.x;
+  if (gloID >= w * h) return;      // in case of extra threads in block
 
   int xCent = w / 2;
   int yCent = h / 2;
@@ -155,10 +157,25 @@ int main (int argc, char **argv)
   cudaMemcpy (d_in, h_in, sizeof (unsigned char) * w * h, cudaMemcpyHostToDevice);
   cudaMemset (d_hough, 0, sizeof (int) * degreeBins * rBins);
 
+  // CUDA Events para medición de tiempo
+  cudaEvent_t start, stop;
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+
   // execution configuration uses a 1-D grid of 1-D blocks, each made of 256 threads
   //1 thread por pixel
   int blockNum = ceil (w * h / 256);
+
+  // Registrar tiempo antes del kernel
+  cudaEventRecord(start);
   GPU_HoughTran <<< blockNum, 256 >>> (d_in, w, h, d_hough, rMax, rScale, d_Cos, d_Sin);
+  // Registrar tiempo después del kernel
+  cudaEventRecord(stop);
+  cudaEventSynchronize(stop);
+
+  // Calcular tiempo transcurrido
+  float kernel_time_ms = 0.0f;
+  cudaEventElapsedTime(&kernel_time_ms, start, stop);
 
   // get results from device
   cudaMemcpy (h_hough, d_hough, sizeof (int) * degreeBins * rBins, cudaMemcpyDeviceToHost);
@@ -169,9 +186,42 @@ int main (int argc, char **argv)
     if (cpuht[i] != h_hough[i])
       printf ("Calculation mismatch at : %i %i %i\n", i, cpuht[i], h_hough[i]);
   }
-  printf("Done!\n");
+  printf("Kernel execution time: %.4f ms\n", kernel_time_ms);
+
+  // Detectar líneas
+  std::vector<imgutils::Line> lines = imgutils::detect_lines(h_hough, degreeBins, rBins, rMax, 30);
+
+  // Cargar imagen original en RGB
+  imgutils::Image *img = imgutils::load_pgm_to_rgb(argv[1], w, h);
+
+  if (img) {
+    // Dibujar líneas detectadas
+    imgutils::draw_lines(img, lines, rMax, rBins);
+
+    // Guardar imagen resultante
+    imgutils::save_image_png("hough_result.png", img);
+
+    // Guardar tiempos en CSV
+    imgutils::save_timing_csv("timing_results.csv", kernel_time_ms, w, h, lines.size());
+
+    delete img;
+  }
+
+  // Limpiar eventos CUDA
+  cudaEventDestroy(start);
+  cudaEventDestroy(stop);
 
   // TODO clean-up
+  free(pcCos);
+  free(pcSin);
+  free(cpuht);
+  free(h_hough);
+  cudaFree(d_Cos);
+  cudaFree(d_Sin);
+  cudaFree(d_in);
+  cudaFree(d_hough);
+
+  printf("Done!\n");
 
   return 0;
 }
