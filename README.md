@@ -123,3 +123,41 @@ Licencia
 --------
 
 Proyecto bajo la licencia que prefieras — añade un archivo `LICENSE` si quieres dejarlo explícito.
+
+
+---
+
+## Resumen: Ejecución completa para verificar todo
+
+```bash
+# 1. Compilar
+make clean && make
+
+# 2. Crear output directory si no existe
+mkdir -p output
+
+# 3. Ejecutar versión GLOBAL (Memory Global)
+echo "=== MEMORIA GLOBAL ==="
+./bin/hough_transform input/test_image.pgm
+# Genera: hough_result_global.png, timing_global.csv
+
+# 4. Ejecutar versión SHARED (Memoria Compartida)
+echo "=== MEMORIA COMPARTIDA ==="
+./bin/hough_shared input/test_image.pgm
+# Genera: hough_result_shared.png, timing_results_shared.csv
+
+# 5. Revisar imágenes generadas
+ls -lah *.png *.csv
+
+# 6. Revisar archivos de tiempos
+cat timing_*.csv
+
+**Archivos finales generados:**
+- `hough_result_global.png` - Líneas detectadas con memoria global
+- `hough_result_shared.png` - Líneas detectadas con memoria compartida
+- `hough_result_constant.ppm` - Líneas detectadas con memoria constante
+- `timing_global.csv` - Tiempos ejecución versión global
+- `timing_results_shared.csv` - Tiempos ejecución versión compartida
+- `timing_constant.csv` - Tiempos ejecución versión constante
+
+---

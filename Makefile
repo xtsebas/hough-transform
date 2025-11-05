@@ -13,21 +13,23 @@ OBJ_DIR = obj
 BIN_DIR = bin
 
 # Archivos
-CUDA_SRCS = $(SRC_DIR)/houghBase.cu $(SRC_DIR)/hough_shared.cu
+CUDA_SRCS = $(SRC_DIR)/houghBase.cu $(SRC_DIR)/hough_shared.cu $(SRC_DIR)/hough_constant.cu
 CXX_SRCS = $(SRC_DIR)/image_utils.cpp
-CUDA_OBJS = $(OBJ_DIR)/houghBase.o $(OBJ_DIR)/hough_shared.o
+CUDA_OBJS = $(OBJ_DIR)/houghBase.o $(OBJ_DIR)/hough_shared.o $(OBJ_DIR)/hough_constant.o
 CXX_OBJS = $(OBJ_DIR)/image_utils.o
 TARGET = $(BIN_DIR)/hough_transform
 TARGET_SHARED = $(BIN_DIR)/hough_shared
+TARGET_CONSTANT = $(BIN_DIR)/hough_constant
 
 # Crear directorios si no existen
 $(shell mkdir -p $(OBJ_DIR) $(BIN_DIR))
 
 # Regla default
-all: $(TARGET)
+all: $(TARGET) $(TARGET_SHARED) $(TARGET_CONSTANT)
 
 # Targets específicos
 shared: $(TARGET_SHARED)
+constant: $(TARGET_CONSTANT)
 
 # Vincular ejecutable hough_transform (original)
 $(TARGET): $(OBJ_DIR)/houghBase.o $(CXX_OBJS)
@@ -35,6 +37,10 @@ $(TARGET): $(OBJ_DIR)/houghBase.o $(CXX_OBJS)
 
 # Vincular ejecutable hough_shared (con memoria compartida)
 $(TARGET_SHARED): $(OBJ_DIR)/hough_shared.o $(CXX_OBJS)
+	$(NVCC) $(NVCC_FLAGS) -o $@ $^
+
+# Vincular ejecutable hough_constant (con memoria constante)
+$(TARGET_CONSTANT): $(OBJ_DIR)/hough_constant.o $(CXX_OBJS)
 	$(NVCC) $(NVCC_FLAGS) -o $@ $^
 
 # Compilar archivos CUDA
@@ -49,4 +55,4 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
-.PHONY: all clean
+.PHONY: all clean shared constant
